@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Chamber</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+  font:16px/1.5 system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  transition: background .3s, color .3s;
+}
+
+      .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin-bottom:16px; }
+      .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+      input { padding:8px 10px; border:1px solid #ccc; border-radius:10px; }
+      button { padding:8px 12px; border-radius:10px; border:1px solid #888; background:#f7f7f7; cursor:pointer; }
+      button:hover { background:#eee; }
+      #messages { list-style:none; padding:0; margin:0; }
+      #messages li { margin:6px 0; }
+      #chatArea { display:none; }
+      .small { font-size:12px; opacity:.8; }
+      .muted { opacity:.7; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .ok { color:#0a7a2a; } .err { color:#b00020; }
+/* --- Theme colours --- */
+:root {
+  --bg: #f7f7f7;
+  --fg: #222;
+  --card-bg: #fff;
+  --border: #ccc;
+  --accent: #0078d7;
+}
+
+body.dark {
+  --bg: #0e1117;
+  --fg: #e2e8f0;
+  --card-bg: #1b1f27;
+  --border: #2a303d;
+  --accent: #00bcd4;
+}
+
+/* Apply theme variables */
+body {
+  background: var(--bg);
+  color: var(--fg);
+  transition: background .3s, color .3s;
+}
+
+/* Header and toggle */
+/* --- Header redesign --- */
+.header {
+  text-align: center;
+  margin: 20px 0 24px 0;
+}
+
+.header h1 {
+  font-family: "Segoe UI Semibold", "Helvetica Neue", Arial, sans-serif;
+  font-size: 42px;
+  letter-spacing: 1px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+#themeToggle {
+  font-size: 18px;
+  background: var(--card-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background .3s, color .3s, transform .2s;
+}
+
+#themeToggle:hover {
+  background: var(--accent);
+  color: #fff;
+  transform: scale(1.05);
+}
+#statusDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background-color: gray;
+  vertical-align: middle;
+  transition: background-color .3s;
+}
+
+
+    </style>
+  </head>
+  <body>
+   <header class="header">
+  <h1>Chamber</h1>
+  <button id="themeToggle" title="Switch theme">☀</button>
+</header>
+
+
+    <p class="muted">No accounts • No logs • Ephemeral rooms (max 2) • End-to-end encrypted</p>
+
+    <!-- Join/Create -->
+    <div id="joinArea" class="card">
+      <h3>Join or Create a Private Room</h3>
+
+      <div class="row" style="margin-bottom:8px;">
+        <label class="small">Room ID</label>
+        <input id="roomIdInput" class="mono" placeholder="Paste room ID or use link" size="34" />
+      </div>
+
+      <div class="row" style="margin-bottom:8px;">
+        <label class="small">Access code</label>
+        <input id="accessCodeInput" class="mono" placeholder="6 character code" size="22" />
+      </div>
+
+      <div class="row" style="margin-bottom:12px;">
+        <label class="small">Shared passphrase (E2EE)</label>
+        <input id="passInput" placeholder="You and partner must match" size="28" />
+        <button id="joinBtn">Join</button>
+      </div>
+
+      <details style="margin-bottom:12px;">
+        <summary>Create a room instead</summary>
+        <div class="row" style="margin-top:8px;">
+          <label class="small">Room lifetime (minutes)</label>
+          <input id="ttlMinutes" type="number" min="1" max="1440" value="60" style="width:120px;" />
+          <button id="createRoomBtn">Create room</button>
+        </div>
+        <div id="createResult" class="small" style="margin-top:8px;"></div>
+      </details>
+
+      <div id="joinStatus" class="small"></div>
+    </div>
+
+    <!-- Chat -->
+    <div id="chatArea" class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <strong>Room:</strong>
+<span id="roomLabel" class="mono"></span>
+<span id="statusDot"></span>
+<span id="peers" class="small muted"></span>
+        </div>
+        <div class="row">
+          <span class="small">Nickname:</span>
+          <input id="nickInput" placeholder="Nick" size="10" autocomplete="off" />
+          <button id="setNickBtn">Set</button>
+        </div>
+      </div>
+
+      <ul id="messages" style="margin-top:12px;"></ul>
+
+      <form id="form" class="row" style="margin-top:12px;">
+        <input id="input" autocomplete="off" placeholder="Type message..." style="flex:1" />
+        <button>Send</button>
+      </form>
+      <div class="small muted" style="margin-top:6px;">Messages are encrypted in your browser before sending.</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+
+      // elements
+      const joinArea = document.getElementById("joinArea");
+      const chatArea = document.getElementById("chatArea");
+      const roomIdInput = document.getElementById("roomIdInput");
+      const accessCodeInput = document.getElementById("accessCodeInput");
+      const passInput = document.getElementById("passInput");
+      const joinBtn = document.getElementById("joinBtn");
+      const joinStatus = document.getElementById("joinStatus");
+      const createRoomBtn = document.getElementById("createRoomBtn");
+      const createResult = document.getElementById("createResult");
+      const ttlMinutes = document.getElementById("ttlMinutes");
+      const roomLabel = document.getElementById("roomLabel");
+      const peers = document.getElementById("peers");
+      const form = document.getElementById("form");
+      const input = document.getElementById("input");
+      const messages = document.getElementById("messages");
+      const nickInput = document.getElementById("nickInput");
+      const setNickBtn = document.getElementById("setNickBtn");
+
+      // helpers
+      function show(el){ el.style.display = "block"; }
+      function hide(el){ el.style.display = "none"; }
+      function nameColor(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%360; return `hsl(${h},70%,45%)`; }
+
+      // nickname  (ephemeral only)
+let nickname = "Anon";
+nickInput.value = nickname;
+setNickBtn.addEventListener("click", () => {
+  nickname = (nickInput.value || "Anon").trim();
+});
+
+
+      // prefill from #roomId:code
+      (function(){
+        const hash = location.hash.slice(1);
+        if (!hash) return;
+        const [rid, code] = hash.split(":");
+        if (rid) roomIdInput.value = rid;
+        if (code) accessCodeInput.value = code;
+      })();
+
+      // ---- Create room (GET) ----
+      async function createRoom() {
+        const ttl = Math.max(1, Math.min(1440, Number(ttlMinutes.value || 60))) * 60;
+        try {
+          const r = await fetch(`/create-room?ttl=${ttl}`, { method: "GET" });
+          if (!r.ok) throw new Error("bad status");
+          const json = await r.json(); // { roomId, codes:[c1,c2], ttl }
+          const base = location.origin;
+          const link1 = `${base}/#${json.roomId}:${json.codes[0]}`;
+          const link2 = `${base}/#${json.roomId}:${json.codes[1]}`;
+          createResult.innerHTML = `
+            <div class="ok">Room created (TTL ${Math.round(json.ttl/60)} min)</div>
+            <div>Room ID: <span class="mono">${json.roomId}</span></div>
+            <div>Code A: <span class="mono">${json.codes[0]}</span> — <a href="${link1}" target="_blank">open link A</a></div>
+            <div>Code B: <span class="mono">${json.codes[1]}</span> — <a href="${link2}" target="_blank">open link B</a></div>
+            <div class="small muted">Send one link to your partner. Each code works once.</div>
+          `;
+          roomIdInput.value = json.roomId;
+          accessCodeInput.value = json.codes[0];
+        } catch {
+          createResult.innerHTML = `<span class="err">Failed to create room.</span>`;
+        }
+      }
+      createRoomBtn.addEventListener("click", createRoom);
+
+      // ---- E2EE primitives (AES-GCM + PBKDF2 with roomId salt) ----
+      const enc = new TextEncoder(), dec = new TextDecoder();
+      let aesKeyPromise = null;
+      async function deriveKey(passphrase, salt) {
+        const baseKey = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+        return crypto.subtle.deriveKey(
+          { name:"PBKDF2", salt: enc.encode(salt), iterations: 100000, hash:"SHA-256" },
+          baseKey,
+          { name:"AES-GCM", length:256 },
+          false,
+          ["encrypt","decrypt"]
+        );
+      }
+      async function encryptMessage(plaintext){
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const key = await aesKeyPromise;
+        const ct = await crypto.subtle.encrypt({ name:"AES-GCM", iv }, key, enc.encode(plaintext));
+        const out = new Uint8Array(iv.byteLength + ct.byteLength);
+        out.set(iv, 0); out.set(new Uint8Array(ct), iv.byteLength);
+        return btoa(String.fromCharCode(...out));
+      }
+      async function decryptMessage(b64){
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const iv = bytes.slice(0,12), data = bytes.slice(12);
+        const key = await aesKeyPromise;
+        const pt = await crypto.subtle.decrypt({ name:"AES-GCM", iv }, key, data);
+        return dec.decode(pt);
+      }
+
+      // ---- Join room (with passphrase) ----
+      function joinRoom(){
+        const roomId = roomIdInput.value.trim();
+        const code = accessCodeInput.value.trim();
+        const pass = (passInput.value || "").trim();
+        if (!roomId || !code) {
+          joinStatus.innerHTML = `<span class="err">Enter room ID and code.</span>`;
+          return;
+        }
+        if (!pass) {
+          joinStatus.innerHTML = `<span class="err">Enter a shared passphrase.</span>`;
+          return;
+        }
+        // derive key first (so early messages decrypt)
+        aesKeyPromise = deriveKey(pass, roomId);
+
+        socket.emit("join", { roomId, code }, (resp) => {
+          if (!resp || !resp.ok) {
+            const map = {
+              room_not_found: "Room not found (maybe expired).",
+              bad_code: "Wrong or already-used code.",
+              room_full: "Room already has 2 people."
+            };
+            joinStatus.innerHTML = `<span class="err">${map[resp?.reason] || "Join failed."}</span>`;
+            return;
+          }
+          joinStatus.innerHTML = `<span class="ok">Joined the room.</span>`;
+          window.currentRoom = roomId;
+          roomLabel.textContent = roomId;
+          peers.textContent = ` • participants: ${resp.participants}`;
+          joinArea.style.display = "none";
+          chatArea.style.display = "block";
+        });
+      }
+      joinBtn.addEventListener("click", joinRoom);
+
+      socket.on("system", (s) => {
+        if (typeof s?.count === "number") peers.textContent = ` • participants: ${s.count}`;
+      });
+
+      // send (encrypt)
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text || !window.currentRoom) return;
+        try {
+          const payload = await encryptMessage(text);
+          socket.emit("chat message", {
+            roomId: window.currentRoom,
+            name: nickname,
+            time: Date.now(),
+            payload
+          });
+          input.value = "";
+        } catch {
+          alert("Encryption failed. Check your passphrase.");
+        }
+      });
+
+      // receive (decrypt)
+      socket.on("chat message", async (msg) => {
+        if (!msg || msg.roomId !== window.currentRoom) return;
+        let display = "";
+        try { display = await decryptMessage(msg.payload || ""); }
+        catch { display = "[cannot decrypt]"; }
+        const li = document.createElement("li");
+        const name = document.createElement("strong");
+        name.textContent = msg.name || "Anon";
+        name.style.color = nameColor(name.textContent);
+        name.style.marginRight = "6px";
+        const time = document.createElement("span");
+        time.textContent = `[${new Date(msg.time || Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}] `;
+        time.className = "small muted";
+        const text = document.createElement("span");
+        text.textContent = display;
+        li.append(time, name, text);
+        messages.appendChild(li);
+        window.scrollTo(0, document.body.scrollHeight);
+      });
+// === Theme toggle ===
+const toggle = document.getElementById("themeToggle");
+toggle.addEventListener("click", () => {
+  document.body.classList.toggle("dark");
+  toggle.textContent = document.body.classList.contains("dark") ? "🌙" : "☀";
+});
+// === Connection status dot ===
+const statusDot = document.getElementById("statusDot");
+
+// when connected
+socket.on("connect", () => {
+  statusDot.style.backgroundColor = "limegreen";
+});
+
+// when disconnected
+socket.on("disconnect", () => {
+  statusDot.style.backgroundColor = "gray";
+});
+
+    </script>
+  </body>
+</html>
+
