@@ -94,7 +94,11 @@ body {
   vertical-align: middle;
   transition: background-color .3s;
 }
-
+.system-msg {
+    color: #888;
+    font-style: italic;
+    margin: 6px 0;
+    text-align: center;
 
     </style>
   </head>
@@ -361,7 +365,21 @@ socket.on("connect", () => {
 socket.on("disconnect", () => {
   statusDot.style.backgroundColor = "gray";
 });
+socket.on("count", (n) => {
+    const el = document.getElementById("participant-count");
+    if (el) el.textContent = n;
+  });
 
+  socket.on("system", (msg) => {
+    const chat = document.getElementById("chat");
+    if (chat) {
+      const div = document.createElement("div");
+      div.className = "system-msg";
+      div.textContent = msg;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  });
     </script>
   </body>
 </html>
