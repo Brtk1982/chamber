@@ -25,13 +25,29 @@ app.use(express.json()); // needed for POST body
 const rooms = new Map(); // roomId -> { codes:Set, participants:Set, ttl, timeout }
 
 function createRoom(ttlSeconds = 3600) {
-  const roomId = genRoomId();
-  const codes = new Set([genAccessCode(), genAccessCode()]); // two one-time codes
-  const meta = { codes, participants: new Set(), ttl: ttlSeconds, timeout: null };
-  meta.timeout = setTimeout(() => rooms.delete(roomId), ttlSeconds * 1000);
-  rooms.set(roomId, meta);
-  return { roomId, codes: [...codes], ttl: ttlSeconds };
+  const roomId = genRoomId();
+  const codes = new Set([genAccessCode(), genAccessCode()]);
+  const meta = { codes, participants: new Set(), ttl: ttlSeconds, timeout: null };
+
+  // Calculate expiry time
+  const expiresAt = Date.now() + ttlSeconds * 1000;
+
+  // Schedule automatic cleanup
+  meta.timeout = setTimeout(() => {
+    io.to(roomId).emit("system", { txt: "Room expired. Connection closed." });
+    io.to(roomId).emit("expire");
+    io.socketsLeave(roomId);
+    for (const id of meta.participants) {
+      const s = io.sockets.sockets.get(id);
+      if (s) s.disconnect(true);
+    }
+    rooms.delete(roomId);
+  }, ttlSeconds * 1000);
+
+  rooms.set(roomId, meta);
+  return { roomId, codes: [...codes], ttl: ttlSeconds, expiresAt };
 }
+
 
 // ---------- room creation endpoints ----------
 app.post("/create-room", (req, res) => {

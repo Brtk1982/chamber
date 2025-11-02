@@ -147,6 +147,8 @@ body {
     <!-- Chat -->
     <div id="chatArea" class="card">
       <div class="row" style="justify-content:space-between;">
+        <div id="ttl-timer" class="small muted" style="margin-bottom:6px;"></div>
+
         <div>
           <strong>Room:</strong>
 <span id="roomLabel" class="mono"></span>
@@ -221,6 +223,7 @@ setNickBtn.addEventListener("click", () => {
           const r = await fetch(`/create-room?ttl=${ttl}`, { method: "GET" });
           if (!r.ok) throw new Error("bad status");
           const json = await r.json(); // { roomId, codes:[c1,c2], ttl }
+          if (json.expiresAt) startCountdown(json.expiresAt);
           const base = location.origin;
           const link1 = `${base}/#${json.roomId}:${json.codes[0]}`;
           const link2 = `${base}/#${json.roomId}:${json.codes[1]}`;
@@ -380,6 +383,25 @@ socket.on("count", (n) => {
       chat.scrollTop = chat.scrollHeight;
     }
   });
+// === Room expiry countdown ===
+function startCountdown(expiresAt) {
+  const el = document.getElementById("ttl-timer");
+  function update() {
+    const secs = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+    const m = Math.floor(secs / 60);
+    const s = String(secs % 60).padStart(2, "0");
+    el.textContent = secs > 0 ? `Room expires in ${m}:${s}` : "Room expired";
+    if (secs > 0) setTimeout(update, 1000);
+  }
+  update();
+}
+
+// Server tells us the room expired
+socket.on("expire", () => {
+  alert("This room has expired. The chat is now closed.");
+  socket.disconnect();
+});
+
     </script>
   </body>
 </html>
