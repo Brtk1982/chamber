@@ -75,6 +75,7 @@ app.get("/create-room", (req, res) => {
 
 // ---------- socket.io ----------
 
+
 // Global join attempts memory (shared by all sockets)
 const joinAttempts = {};
 const LIMIT = 10;          // max 10 join attempts
@@ -83,11 +84,12 @@ const WINDOW = 60 * 1000;  // within 1 minute
 io.on("connection", (socket) => {
   console.log("A user connected");
 
+  // --- JOIN ROOM ---
   socket.on("join", ({ roomId, code }, cb) => {
     const ip = socket.handshake.address;
     const now = Date.now();
 
-    // clean old attempts
+    // --- RATE LIMITING ---
     if (!joinAttempts[ip]) joinAttempts[ip] = [];
     joinAttempts[ip] = joinAttempts[ip].filter(t => now - t < WINDOW);
     joinAttempts[ip].push(now);
@@ -96,32 +98,24 @@ io.on("connection", (socket) => {
       return cb?.({ ok: false, reason: "too_many_attempts" });
     }
 
-    // --- existing join logic continues below ---
-
-
-  // --- JOIN ROOM ---
-  socket.on("join", ({ roomId, code }, cb) => {
+    // --- JOIN LOGIC ---
     const meta = rooms.get(roomId);
     if (!meta) return cb?.({ ok: false, reason: "room_not_found" });
     if (meta.participants.size >= 2) return cb?.({ ok: false, reason: "room_full" });
     if (!code || !meta.codes.has(code)) return cb?.({ ok: false, reason: "bad_code" });
 
-    // consume one-time code and track participant
     meta.codes.delete(code);
     meta.participants.add(socket.id);
     socket.join(roomId);
-    socket.roomId = roomId; // remember it for disconnect
+    socket.roomId = roomId;
     socket.code = code;
 
-    // notify both users
     const count = meta.participants.size;
     io.to(roomId).emit("system", { txt: "Participant joined", count });
     io.to(roomId).emit("count", count);
 
-    // confirm to the joiner
     cb?.({ ok: true, participants: count, remainingCodes: meta.codes.size });
 
-    // --- DISCONNECT CLEANUP ---
     socket.once("disconnect", () => {
       const m = rooms.get(roomId);
       if (!m) return;
@@ -148,8 +142,8 @@ io.on("connection", (socket) => {
   });
 });
 
-
 // ---------- start ----------
 http.listen(3000, () => {
-  console.log("Listening on *:3000");
+  console.log("Listening on *:3000");
 });
+
