@@ -1,5 +1,17 @@
 const express = require("express");
 const app = express();
+const rateLimit = require("express-rate-limit");
+
+// Limit each IP to 30 create-room requests per hour
+const createRoomLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 30,
+  message: { error: "Too many rooms created from this IP. Try again later." },
+});
+
+// Apply only to the /create-room route
+app.use("/create-room", createRoomLimiter);
+
 const http = require("http").createServer(app);
 const io = require("socket.io")(http, {
   pingInterval: 20000, // send heartbeat every 20s
@@ -62,8 +74,30 @@ app.get("/create-room", (req, res) => {
 });
 
 // ---------- socket.io ----------
+
+// Global join attempts memory (shared by all sockets)
+const joinAttempts = {};
+const LIMIT = 10;          // max 10 join attempts
+const WINDOW = 60 * 1000;  // within 1 minute
+
 io.on("connection", (socket) => {
   console.log("A user connected");
+
+  socket.on("join", ({ roomId, code }, cb) => {
+    const ip = socket.handshake.address;
+    const now = Date.now();
+
+    // clean old attempts
+    if (!joinAttempts[ip]) joinAttempts[ip] = [];
+    joinAttempts[ip] = joinAttempts[ip].filter(t => now - t < WINDOW);
+    joinAttempts[ip].push(now);
+
+    if (joinAttempts[ip].length > LIMIT) {
+      return cb?.({ ok: false, reason: "too_many_attempts" });
+    }
+
+    // --- existing join logic continues below ---
+
 
   // --- JOIN ROOM ---
   socket.on("join", ({ roomId, code }, cb) => {
