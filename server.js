@@ -14,8 +14,8 @@ app.use("/create-room", createRoomLimiter);
 
 const http = require("http").createServer(app);
 const io = require("socket.io")(http, {
-  pingInterval: 20000, // send heartbeat every 20s
-  pingTimeout: 60000,  // allow up to 60s for response
+  pingInterval: 30000, // send heartbeat every 30s
+  pingTimeout: 150000,  // allow up to 2.5min for response
 });
 
 const crypto = require("crypto");
