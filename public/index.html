@@ -105,6 +105,113 @@ body {
   <body>
    <header class="header">
   <h1>Chamber</h1>
+<!-- Unified Info Popup -->
+<button id="infoBtn" style="
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  color: #999;
+  cursor: pointer;
+" title="How it works">ℹ️</button>
+
+<div id="infoModal" style="
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.6);
+  z-index: 9999;
+  justify-content: center;
+  align-items: center;
+">
+  <div style="
+  background: #111;
+  color: #eee;
+  padding: 22px;
+  border-radius: 12px;
+  max-width: 440px;
+  max-height: 80vh;          /* keep it inside screen height */
+  overflow-y: auto;          /* allow internal scroll if needed */
+  line-height: 1.45;
+  font-size: 0.95rem;
+  box-shadow: 0 0 15px rgba(0,0,0,0.5);
+  scrollbar-width: thin;
+  scrollbar-color: #333 #111;
+">
+
+    <h2 style="text-align:center;">🕳️ Chamber — How It Works</h2>
+
+    <p><b>What It Is:</b><br>
+    Chamber is a private, ephemeral two-person chat. No accounts, no storage, no tracking — 
+    just a quiet space for one conversation at a time.</p>
+
+    <hr style="border: none; border-top: 1px solid #333; margin: 10px 0;">
+
+    <p><b>1️⃣ Create Room</b><br>
+    Click <b>“Create Room”</b> to generate a <b>Room ID</b> and two one-time <b>Access Codes</b>.</p>
+
+    <p><b>2️⃣ Set a Passphrase</b><br>
+    Both users must enter the <b>exact same passphrase</b>.  
+    It encrypts and decrypts all chat messages locally.  
+    You can generate or exchange it safely using 
+    <a href="https://lockpad.microfixhub.com" target="_blank" style="color:#66f;">LockPad</a>.</p>
+
+    <p><b>3️⃣ Share Securely</b><br>
+    Send one Access Code + the Room ID to your chat partner.  
+    Each code works once — when both are used, the room locks.</p>
+
+    <p><b>4️⃣ Chat Privately</b><br>
+    Messages are encrypted end-to-end in your browser.  
+    Nothing is stored or logged anywhere — not even temporarily.</p>
+
+    <p><b>5️⃣ Stay Active</b><br>
+    Idle chats close automatically after a few minutes.  
+    If it expires, simply create a new room.</p>
+
+    <p><b>6️⃣ Done Means Gone</b><br>
+    Close the tab → everything disappears.  
+    No archives, no history, no recovery.</p>
+
+    <hr style="border: none; border-top: 1px solid #333; margin: 10px 0;">
+
+    <h3 style="text-align:center;">👤 About</h3>
+    <p>
+    Built by one human and an AI assistant — a small act of resistance against total surveillance.  
+    Chamber isn’t funded or tracked.  
+    It exists simply because <b>privacy still matters</b>,  
+    and trust shouldn’t depend on a corporation’s policy.
+    </p>
+
+    <p style="text-align:center; font-style:italic; color:#aaa;">
+  “Not the most convenient — but one function, done right.”
+</p>
+
+<p style="text-align:center; font-size:0.85rem; color:#777;">
+  🔗 <a href="https://github.com/Brtk1982/chamber" target="_blank" style="color:#66f;">
+  View Chamber on GitHub</a><br>
+  Open-source. Transparent. Yours to inspect.
+</p>
+
+<button id="closeInfo" style="
+  display:block;
+  margin:12px auto 0;
+  background:#222;
+  border:1px solid #555;
+  border-radius:8px;
+  padding:6px 16px;
+  color:#ccc;
+  cursor:pointer;
+">Close</button>
+
+  </div>
+</div>
+
   <button id="themeToggle" title="Switch theme">☀</button>
 </header>
 
@@ -411,6 +518,16 @@ socket.on("expire", () => {
 ">
   ⚠️ Chats close automatically if inactive for a few minutes.
 </div>
+<script>
+const infoBtn = document.getElementById("infoBtn");
+const infoModal = document.getElementById("infoModal");
+const closeInfo = document.getElementById("closeInfo");
+
+infoBtn.onclick = () => { infoModal.style.display = "flex"; };
+closeInfo.onclick = () => { infoModal.style.display = "none"; };
+window.onclick = (e) => { if (e.target === infoModal) infoModal.style.display = "none"; };
+</script>
+
   </body>
 </html>
 
